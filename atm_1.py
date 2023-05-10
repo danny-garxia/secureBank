@@ -1,5 +1,6 @@
 import socket
 import ssl
+from cryptography.hazmat.primitives import serialization, hashes
 
 #from bank import SERVER as SERVER_HOST
 #from bank import PORT as SERVER_PORT
@@ -14,6 +15,14 @@ ADDR = (SERVER, PORT)
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 #client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 client.connect(ADDR)
+
+#load atm1 private key  // getting error so i commented it out
+# with open('private-key-atm-1.pem', 'rb') as keyfile:
+#     private_key_atm_1 = serialization.load_pem_private_key(keyfile.read())
+
+# Load banks public key
+with open('public-key-bank.pem', 'rb') as keyfile:
+    public_key_bank = serialization.load_pem_public_key(keyfile.read())
 
 def send(msg):
     message = msg.encode(FORMAT)
@@ -31,10 +40,5 @@ id = input()
 print("Please enter your password")
 passowrd = input()
 
-# send("Hello World!")
-# input()
-# send("Hello Everyone!")
-# input()
-# send("Hello Tim!")
 
 # send(DISCONNECT_MESSAGE)

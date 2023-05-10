@@ -1,5 +1,6 @@
 import socket
 import ssl
+from cryptography.hazmat.primitives import serialization, hashes
 
 HEADER = 64
 PORT = 5054
@@ -20,11 +21,19 @@ def send(msg):
     client.send(message)
     print(client.recv(2048).decode(FORMAT))
 
+#load atm2 private key   // getting error so i commented it out
+# with open('private-key-atm-2.pem', 'rb') as keyfile:
+#     private_key_atm_2 = serialization.load_pem_private_key(keyfile.read())
+#Load banks public key 
+with open('public-key-bank.pem', 'rb') as keyfile:
+    public_key_bank = serialization.load_pem_public_key(keyfile.read())
+
 print("[Hello! This is ATM 2]")
 print("Please enter you ID")
 id = input()
 print("Please enter your password")
 passowrd = input()
+
 # send("Hello World!")
 # input()
 # send("Hello Everyone!")
