@@ -1,19 +1,19 @@
 import socket
-import sys
-import os
+import ssl
 
-HEADER = 2048
-PORT = 5051
-FORMAT = "utf-8"
-DC = "GOODBYE"
-SERVER = "localhost"
+#from bank import SERVER as SERVER_HOST
+#from bank import PORT as SERVER_PORT
 
-# SERVER = sys.argv[1] would be used if we would bind to 137.151.27.1 which is ecs.fullerton.edu IP
+HEADER = 64
+PORT = 5053
+FORMAT = 'utf-8'
+DISCONNECT_MESSAGE = "!DISCONNECT"
+SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 client.connect(ADDR)
-
 
 def send(msg):
     message = msg.encode(FORMAT)
@@ -22,30 +22,12 @@ def send(msg):
     send_length += b' ' * (HEADER - len(send_length))
     client.send(send_length)
     client.send(message)
-    
+    print(client.recv(2048).decode(FORMAT))
 
-connected = True
-while connected:
+send("Hello World!")
+input()
+send("Hello Everyone!")
+input()
+send("Hello Tim!")
 
-    command = input("ftp> ".split())
-
-    if len(command) == 0:
-        continue
-    # allows user to exit with the following quit command
-    if command == "quit":
-        send(DC)
-        print(f"[DISCONNECTING] from {sys.argv[1]}!!!!!!!")
-        break
-    # allows users to list the conntents of CWD
-    elif command == "ls":
-        send(command)
-        print(client.recv(HEADER).decode(FORMAT))
-
-    # Here we are sending over the command of get/pull which will be dealt with on the server side
-    else:
-        send(command)
-
-
-
-
-
+send(DISCONNECT_MESSAGE)
