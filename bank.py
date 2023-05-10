@@ -14,6 +14,16 @@ server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 #server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(ADDR)
 
+
+#mock data
+account = {
+    "Name" : "Joe Biden",
+    "ID" : 123456,
+    "password" : "test123"
+
+
+}
+
 def display_amount_money():
     # TODO add display amout of money in account
     pass
