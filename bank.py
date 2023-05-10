@@ -4,7 +4,7 @@ import ssl
 
 
 HEADER = 64
-PORT = 5053
+PORT = 5054
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = 'utf-8'

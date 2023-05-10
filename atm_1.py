@@ -5,7 +5,7 @@ import ssl
 #from bank import PORT as SERVER_PORT
 
 HEADER = 64
-PORT = 5053
+PORT = 5054
 FORMAT = 'utf-8'
 DISCONNECT_MESSAGE = "!DISCONNECT"
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -24,10 +24,17 @@ def send(msg):
     client.send(message)
     print(client.recv(2048).decode(FORMAT))
 
-send("Hello World!")
-input()
-send("Hello Everyone!")
-input()
-send("Hello Tim!")
 
-send(DISCONNECT_MESSAGE)
+print("[Hello! This is ATM 1]")
+print("Please enter you ID")
+id = input()
+print("Please enter your password")
+passowrd = input()
+
+# send("Hello World!")
+# input()
+# send("Hello Everyone!")
+# input()
+# send("Hello Tim!")
+
+# send(DISCONNECT_MESSAGE)
