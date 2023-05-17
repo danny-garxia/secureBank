@@ -1,7 +1,9 @@
 import socket
 import ssl
 import json
+import base64
 from Crypto.Signature import pkcs1_15
+
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 
@@ -20,8 +22,8 @@ client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect(ADDR)
 
 #load atm1 private key  // getting error so i commented it out
-with open('private-key-atm-1.pem', 'rb') as keyfile:
-    private_key_atm_1 = serialization.load_pem_private_key(keyfile.read())
+with open('private-key-atm-1.pem', 'rb') as prv_file:
+    private_key_atm_1 = serialization.load_pem_private_key(prv_file.read(), password= None)
 
 # Load banks public key
 with open('public-key-bank.pem', 'rb') as keyfile:
@@ -29,6 +31,7 @@ with open('public-key-bank.pem', 'rb') as keyfile:
 
 def send(msg):
     message = msg.encode(FORMAT)
+    print(f"sending message: {message}")
     msg_length = len(message)
     send_length = str(msg_length).encode(FORMAT)
     send_length += b' ' * (HEADER - len(send_length))
@@ -54,9 +57,25 @@ DS_E_User_Acount_1 = private_key_atm_1.sign(encrypted_user_account_1,
                                             padding.PSS(mgf=padding.MGF1(hashes.SHA256()), 
                                                         salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
 
+# need to switch both to base64
+encrypted_user_account_1 = base64.b64encode(encrypted_user_account_1).decode(FORMAT)
+DS_E_User_Acount_1 = base64.b64encode(DS_E_User_Acount_1).decode(FORMAT)
+
+
 # this is the messege that we will send which contains the digitaly signed encryoted message
-message = json.dumps({'encrypted_user_account_1': encrypted_user_account_1.decode(FORMAT), 
-                      'Digital_SIgnature': DS_E_User_Acount_1.decode(FORMAT)}).encode(FORMAT)
+message = json.dumps({'encrypted_user_account_1': encrypted_user_account_1, 
+                      'Digital_Signature': DS_E_User_Acount_1}).encode(FORMAT)
 
 
+msg_length = len(message)
+client.sendall(msg_length.to_bytes(HEADER, 'big'))
+print(message)
+client.sendall(message)
+
+# msg_length = str(len(message)).encode(FORMAT)
+# msg_length += b' ' * (HEADER - len(msg_length))
+# client.send(msg_length)
+# print(message)
+# client.send(message)
+#client.send(message)
 # send(DISCONNECT_MESSAGE)

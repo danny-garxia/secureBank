@@ -1,6 +1,11 @@
 import socket 
 import threading
 import ssl
+import json
+import base64
+import sys
+from Crypto.Signature import pkcs1_15
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 
 
@@ -16,8 +21,8 @@ server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind(ADDR)
 
 #Load Banks private key // getting error so i commented it out
-# with open('private-key-bank.pem', 'rb') as keyfile:
-#     private_key_bank = serialization.load_pem_private_key(keyfile.read())
+with open('private-key-bank.pem', 'rb') as keyfile:
+    private_key_bank = serialization.load_pem_private_key(keyfile.read(), password=None)
 
 #Load ATMs Public Keys
 with open('public-key-atm-1.pem', 'rb') as keyfile:
@@ -31,9 +36,9 @@ account = {
     "Name" : "Joe Biden",
     "ID" : 123456,
     "password" : "test123"
-
-
 }
+
+
 
 def display_amount_money():
     # TODO add display amout of money in account
@@ -61,17 +66,67 @@ def handle_client(conn, addr):
 
     connected = True
     while connected:
-        msg_length = conn.recv(HEADER).decode(FORMAT)
+        msg_length_bytes = conn.recv(HEADER)
+        msg_length = int.from_bytes(msg_length_bytes, 'big')
         if msg_length:
             msg_length = int(msg_length)
+            #msg = ""
+            #while len(msg) < msg_length:
+                #chunk = conn.recv(min(msg_length - len(msg), 4096)).decode(FORMAT)
+                #msg += chunk
             msg = conn.recv(msg_length).decode(FORMAT)
             if msg == DISCONNECT_MESSAGE:
                 connected = False
-
+            #print(msg)
             print(f"[{addr}] {msg}")
             conn.send("Msg received".encode(FORMAT))
+################################################
+            message_from_atm = json.loads(msg)
+            encrypted_message_from_atm = base64.b64decode(message_from_atm['encrypted_user_account_1'])
+            #decrypted_message_from_atm = private_key_bank.decrypt(encrypted_message_from_atm,
+                                                                   #padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                                                                                #algorithm=hashes.SHA256(), label=None))
+            digital_signature = base64.b64decode(message_from_atm['Digital_Signature'])
+
+            try:
+                public_key_atm_1.verify(digital_signature,
+                                        encrypted_message_from_atm,
+                                        padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
+                                                    salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
+                print('Signature valid', addr)
+            except:
+                print('Signature not valid', addr)
 
     conn.close()
+
+
+
+    
+    #message = conn.recv(1024)
+    #if not message:
+        #sys.exit()
+    # load the data we received
+    # messege_from_atm = json.loads(message.decode(FORMAT))
+    # # grab the encrypted user account and decrypt it. 
+    # encrypted_messege_from_atm = messege_from_atm['encrypted_user_account_1'].encode(FORMAT)
+    # decrypted_messege_from_atm = private_key_bank.decrypt(encrypted_messege_from_atm, 
+    #                                                       padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), 
+    #                                                            algorithm=hashes.SHA256(), label=None))
+    # # now we have to verify the digital signature
+    # digital_signature = messege_from_atm['Digital_SIgnature'].encode(FORMAT)
+   
+
+    # try: 
+    #     public_key_atm_1.verify(digital_signature, 
+    #                             encrypted_messege_from_atm,
+    #                             padding.PSS(mgf=padding.MGF1(hashes.SHA256()), 
+    #                             salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
+    # except:
+    #     print('Signature not valid', addr)
+    #     conn.close()
+    #     raise
+
+    #conn.close()
         
 
 def start():
@@ -82,6 +137,8 @@ def start():
         thread = threading.Thread(target=handle_client, args=(conn, addr))
         thread.start()
         print(f"[ACTIVE CONNECTIONS] {threading.activeCount() - 1}")
+        #handle_client(conn,addr)
+        
 
 
 print("[STARTING] server is starting...")
