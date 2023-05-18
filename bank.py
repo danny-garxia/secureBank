@@ -61,25 +61,63 @@ def quit():
     # TODO quit 
     pass
 
+def send(msg):
+    #get the data length
+    msg_length = len(server, msg)
+
+    # string the datat length
+    strLen = str(msg_length)
+
+    # padd the header with "0"
+    while len(strLen) < HEADER:
+        strLen = "0" + strLen
+
+    # the final messege
+    finalmsg = strLen.encode() + msg
+    server.sendall(finalmsg)
+
+def recv(server):
+
+        # receive the header
+    header = server.recv(HEADER)
+
+        #decode into a string
+    strHead = header.decode()
+
+        #convert the header into an int
+    intHead = int(strHead)
+
+    data = b''
+    recvData = b''
+
+    while len(data) < intHead:
+        recvData = server.recv(intHead - len(data))
+
+        if recvData:
+            data += recvData
+    return data
+
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
 
     connected = True
     while connected:
-        msg_length_bytes = conn.recv(HEADER)
-        msg_length = int.from_bytes(msg_length_bytes, 'big')
+        msg_length = conn.recv(HEADER).decode(FORMAT)
         if msg_length:
             msg_length = int(msg_length)
-            #msg = ""
-            #while len(msg) < msg_length:
-                #chunk = conn.recv(min(msg_length - len(msg), 4096)).decode(FORMAT)
-                #msg += chunk
+          
             msg = conn.recv(msg_length).decode(FORMAT)
             if msg == DISCONNECT_MESSAGE:
                 connected = False
             #print(msg)
             print(f"[{addr}] {msg}")
             conn.send("Msg received".encode(FORMAT))
+
+
+
+
+
+
 ################################################
             message_from_atm = json.loads(msg)
             encrypted_message_from_atm = base64.b64decode(message_from_atm['encrypted_user_account_1'])
@@ -101,34 +139,6 @@ def handle_client(conn, addr):
 
 
 
-    
-    #message = conn.recv(1024)
-    #if not message:
-        #sys.exit()
-    # load the data we received
-    # messege_from_atm = json.loads(message.decode(FORMAT))
-    # # grab the encrypted user account and decrypt it. 
-    # encrypted_messege_from_atm = messege_from_atm['encrypted_user_account_1'].encode(FORMAT)
-    # decrypted_messege_from_atm = private_key_bank.decrypt(encrypted_messege_from_atm, 
-    #                                                       padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), 
-    #                                                            algorithm=hashes.SHA256(), label=None))
-    # # now we have to verify the digital signature
-    # digital_signature = messege_from_atm['Digital_SIgnature'].encode(FORMAT)
-   
-
-    # try: 
-    #     public_key_atm_1.verify(digital_signature, 
-    #                             encrypted_messege_from_atm,
-    #                             padding.PSS(mgf=padding.MGF1(hashes.SHA256()), 
-    #                             salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
-    # except:
-    #     print('Signature not valid', addr)
-    #     conn.close()
-    #     raise
-
-    #conn.close()
-        
-
 def start():
     server.listen()
     print(f"[LISTENING] Server is listening on {SERVER}")
@@ -137,7 +147,7 @@ def start():
         thread = threading.Thread(target=handle_client, args=(conn, addr))
         thread.start()
         print(f"[ACTIVE CONNECTIONS] {threading.activeCount() - 1}")
-        #handle_client(conn,addr)
+        
         
 
 

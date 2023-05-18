@@ -3,24 +3,24 @@ import ssl
 import json
 import base64
 from Crypto.Signature import pkcs1_15
-
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 
-#from bank import SERVER as SERVER_HOST
-#from bank import PORT as SERVER_PORT
 
-HEADER = 64
+
+HEADER = 10
 PORT = 5054
 FORMAT = 'utf-8'
 DISCONNECT_MESSAGE = "!DISCONNECT"
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 
+# CREATE SOCKET ########################################
+########################################################
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 client.connect(ADDR)
 
+#LOAD KEYS##############################################
 #load atm1 private key  // getting error so i commented it out
 with open('private-key-atm-1.pem', 'rb') as prv_file:
     private_key_atm_1 = serialization.load_pem_private_key(prv_file.read(), password= None)
@@ -29,53 +29,95 @@ with open('private-key-atm-1.pem', 'rb') as prv_file:
 with open('public-key-bank.pem', 'rb') as keyfile:
     public_key_bank = serialization.load_pem_public_key(keyfile.read())
 
+
+# fucntion to send messge properly
 def send(msg):
-    message = msg.encode(FORMAT)
-    print(f"sending message: {message}")
-    msg_length = len(message)
-    send_length = str(msg_length).encode(FORMAT)
-    send_length += b' ' * (HEADER - len(send_length))
-    client.send(send_length)
+    #get the data length
+    msg_length = len(client, msg)
+
+    # string the datat length
+    strLen = str(msg_length)
+
+    # padd the header with "0"
+    while len(strLen) < HEADER:
+        strLen = "0" + strLen
+
+    # the final messege
+    finalmsg = strLen.encode() + msg
+    client.sendall(finalmsg)
+
+
+# function to recevive messege properly
+def recv(client):
+
+        # receive the header
+    header = client.recv(HEADER)
+
+        #decode into a string
+    strHead = header.decode()
+
+        #convert the header into an int
+    intHead = int(strHead)
+
+    data = b''
+    recvData = b''
+
+    while len(data) < intHead:
+        recvData = client.recv(intHead - len(data))
+
+        if recvData:
+            data += recvData
+    return data
+
+
+def RSAEncryption():
+    print("-------------------------------------------------")
+    print("[Hello! This is ATM 1]")
+    print("Please enter you ID")
+    id = input()
+    print("Please enter your password")
+    password = input()
+
+
+    # this will take id and passowrd and make it into a dictionary using json.sumps
+    user_account_1 = json.dumps({'ID': id, 'password': password}).encode(FORMAT)
+    # Encrypts user_account dictionary with banks public key using SHA256 encryption. 
+    encrypted_user_account_1 = public_key_bank.encrypt(user_account_1, 
+                                                    padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                                                                algorithm=hashes.SHA256(), label=None))
+    # provides a digital signature to our encrpyted user acount. 
+    DS_E_User_Acount_1 = private_key_atm_1.sign(encrypted_user_account_1,
+                                                padding.PSS(mgf=padding.MGF1(hashes.SHA256()), 
+                                                            salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
+
+    # need to switch both to base64
+    encrypted_user_account_1 = base64.b64encode(encrypted_user_account_1).decode(FORMAT)
+    DS_E_User_Acount_1 = base64.b64encode(DS_E_User_Acount_1).decode(FORMAT)
+
+
+    # this is the messege that we will send which contains the digitaly signed encryoted message
+    message = json.dumps({'encrypted_user_account_1': encrypted_user_account_1, 
+                        'Digital_Signature': DS_E_User_Acount_1}).encode(FORMAT)
+
+
+    print(message)
     client.send(message)
-    print(client.recv(2048).decode(FORMAT))
 
 
+def DSAEncryption():
+    pass
+
+#prompt to see what encryption to use
 print("[Hello! This is ATM 1]")
-print("Please enter you ID")
-id = input()
-print("Please enter your password")
-password = input()
+print("How would you like to encypt your data?")
+print("[1] RSA encryption")
+print("[2] DSA Encryption")
 
-# this will take id and passowrd and make it into a dictionary using json.sumps
-user_account_1 = json.dumps({'ID': id, 'password': password}).encode(FORMAT)
-# Encrypts user_account dictionary with banks public key using SHA256 encryption. 
-encrypted_user_account_1 = public_key_bank.encrypt(user_account_1, 
-                                                 padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                                                               algorithm=hashes.SHA256(), label=None))
-# provides a digital signature to our encrpyted user acount. 
-DS_E_User_Acount_1 = private_key_atm_1.sign(encrypted_user_account_1,
-                                            padding.PSS(mgf=padding.MGF1(hashes.SHA256()), 
-                                                        salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
-
-# need to switch both to base64
-encrypted_user_account_1 = base64.b64encode(encrypted_user_account_1).decode(FORMAT)
-DS_E_User_Acount_1 = base64.b64encode(DS_E_User_Acount_1).decode(FORMAT)
-
-
-# this is the messege that we will send which contains the digitaly signed encryoted message
-message = json.dumps({'encrypted_user_account_1': encrypted_user_account_1, 
-                      'Digital_Signature': DS_E_User_Acount_1}).encode(FORMAT)
-
-
-msg_length = len(message)
-client.sendall(msg_length.to_bytes(HEADER, 'big'))
-print(message)
-client.sendall(message)
-
-# msg_length = str(len(message)).encode(FORMAT)
-# msg_length += b' ' * (HEADER - len(msg_length))
-# client.send(msg_length)
-# print(message)
-# client.send(message)
-#client.send(message)
-# send(DISCONNECT_MESSAGE)
+# choose encryption
+option = input()
+if option == '1':
+    RSAEncryption()
+elif option == 2:
+    DSAEncryption()
+else:
+    print("Pease enter a valid option")
