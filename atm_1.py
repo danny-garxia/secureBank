@@ -41,20 +41,19 @@ with open('public-key-bank-dsa.pem', 'rb') as keyfile:
 
 # fucntion to send messge properly
 def send(msg):
-    #get the data length
-    msg_length = len(client, msg)
+    # Get the data length
+    msg_length = len(msg)
 
-    # string the datat length
+    # Convert the length to a string
     strLen = str(msg_length)
 
-    # padd the header with "0"
+    # Pad the header with "0"
     while len(strLen) < HEADER:
         strLen = "0" + strLen
 
-    # the final messege
+    # The final message
     finalmsg = strLen.encode() + msg
     client.sendall(finalmsg)
-
 
 # function to recevive messege properly
 def recv(client):
@@ -161,3 +160,182 @@ elif option == '2':
     DSAEncryption()
 else:
     print("Pease enter a valid option")
+    
+def checkFunds():
+    print("-------------------------------------------------")
+    print("[Hello! This is ATM 1]")
+    print("Checking funds...")
+
+    # checking funds using the dictionary
+    request_message = json.dumps({'request': 'checkFunds'}).encode(FORMAT)
+    # encrypting request message with banks public key using SHA256 encryption
+    encrypted_request = public_key_bank.encrypt(request_message, padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None))
+
+    signature = private_key_atm_1.sign(request_message, padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
+
+    final_output = base64.b64encode(signature + encrypted_request)
+
+    send(final_output)
+    result = recv(client)
+    result = base64.b64decode(result)
+    signature = result[:256]
+    encrypted_result = result[256:]
+    decrypted_result = private_key_atm_1.decrypt(encrypted_result, padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None))
+
+    try:
+        public_key_bank.verify(signature, decrypted_result, padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
+        print("This message is authentic.")
+    except Exception as e:
+        print("This message is not authentic.")
+        print("Error: ", e)
+
+    decrypted_result = json.loads(decrypted_result.decode(FORMAT))
+    print("Your account balance is: $", decrypted_result["account_balance"])
+    print("-------------------------------------------------")
+
+
+print("What would you like to do?")
+print("1. Check account balance")
+print("2. Withdrawl")
+print("3. Deposit")
+print("4. Exit")
+
+option = input()
+
+if option == '1':
+    DSAEncryption()
+    checkFunds()
+
+elif option == '2':
+    DSAEncryption()
+    withdraw()
+
+elif option == '3':
+    DSAEncryption()
+    deposit()
+
+elif option =='4':
+    send(DISCONNECT_MESSAGE)
+
+else:
+    print("Invalid option.")
+
+def withdraw(amount):
+    print("-------------------------------------------------")
+    print("[Hello! This is ATM 1]")
+    print("Withdrawing funds...")
+
+    # Create a request message with the withdrawal amount
+    request_message = json.dumps({'request': 'withdraw', 'amount': amount}).encode(FORMAT)
+
+    # Encrypt the request message using the bank's public key
+    encrypted_request = public_key_bank.encrypt(request_message, 0)
+
+    # Sign the encrypted request using the ATM1's private key
+    signer = DSS.new(dsa_private_key_atm_1, 'fips-186-3')
+    signature = signer.sign(encrypted_request)
+
+    # Encode the encrypted request and signature in base64
+    encoded_encrypted_request = base64.b64encode(encrypted_request).decode(FORMAT)
+    encoded_signature = base64.b64encode(signature).decode(FORMAT)
+
+    # Create the message that will be sent, containing the encoded encrypted request and signature
+    message = json.dumps({'encrypted_request': encoded_encrypted_request,
+                          'signature': encoded_signature}).encode(FORMAT)
+
+    # Send the message to the bank
+    client.send(message)
+
+    # Receive the response from the bank
+    response = recv(client)
+
+    # Decode the response
+    response = response.decode(FORMAT)
+
+    # Parse the response as JSON
+    response_json = json.loads(response)
+
+    # Extract the encoded encrypted response and signature from the response JSON
+    encoded_encrypted_response = response_json['encrypted_response']
+    encoded_signature = response_json['signature']
+
+    # Decode the encoded encrypted response and signature from base64
+    encrypted_response = base64.b64decode(encoded_encrypted_response)
+    signature = base64.b64decode(encoded_signature)
+
+    # Verify the signature using the bank's public key and ATM1's DSA private key
+    verifier_bank = DSS.new(dsa_public_key_bank, 'fips-186-3')
+    verifier_atm_1 = DSS.new(dsa_private_key_atm_1, 'fips-186-3')
+
+    try:
+        verifier_bank.verify(encrypted_response, signature)
+        verifier_atm_1.verify(encrypted_response, signature)
+        print("Withdrawal successful.")
+    except ValueError:
+        print("Invalid response received from the bank.")
+
+def deposit(amount):
+    print("-------------------------------------------------")
+    print("[Hello! This is ATM 1]")
+    print("Depositing funds...")
+
+    # Create a request message with the deposit amount
+    request_message = json.dumps({'request': 'deposit', 'amount': amount}).encode(FORMAT)
+
+    # Encrypt the request message using the bank's public key
+    encrypted_request = public_key_bank.encrypt(request_message, 0)
+
+    # Sign the encrypted request using the ATM1's private key
+    signer = DSS.new(dsa_private_key_atm_1, 'fips-186-3')
+    signature = signer.sign(encrypted_request)
+
+    # Encode the encrypted request and signature in base64
+    encoded_encrypted_request = base64.b64encode(encrypted_request).decode(FORMAT)
+    encoded_signature = base64.b64encode(signature).decode(FORMAT)
+
+    # Create the message that will be sent, containing the encoded encrypted request and signature
+    message = json.dumps({'encrypted_request': encoded_encrypted_request,
+                          'signature': encoded_signature}).encode(FORMAT)
+
+    # Send the message to the bank
+    client.send(message)
+
+    # Receive the response from the bank
+    response = recv(client)
+
+    # Decode the response
+    response = response.decode(FORMAT)
+
+    # Parse the response as JSON
+    response_json = json.loads(response)
+
+    # Extract the encoded encrypted response and signature from the response JSON
+    encoded_encrypted_response = response_json['encrypted_response']
+    encoded_signature = response_json['signature']
+
+    # Decode the encoded encrypted response and signature from base64
+    encrypted_response = base64.b64decode(encoded_encrypted_response)
+    signature = base64.b64decode(encoded_signature)
+
+    # Verify the signature using the bank's public key and ATM1's DSA private key
+    verifier_bank = DSS.new(dsa_public_key_bank, 'fips-186-3')
+    verifier_atm_1 = DSS.new(dsa_private_key_atm_1, 'fips-186-3')
+
+    try:
+        verifier_bank.verify(encrypted_response, signature)
+        verifier_atm_1.verify(encrypted_response, signature)
+        print("Deposit successful.")
+    except ValueError:
+        print("Invalid response received from the bank.")
+
+
+
+# Uncomment the following lines to test the checkFunds, withdraw, and deposit functions
+
+checkFunds()
+withdraw(100)
+deposit(200)
+
+# Disconnect from the server
+client.send(DISCONNECT_MESSAGE.encode(FORMAT))
+client.close()
