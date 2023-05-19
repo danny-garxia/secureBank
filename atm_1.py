@@ -33,11 +33,11 @@ with open('public-key-bank.pem', 'rb') as keyfile:
 
 #Load DSA Keys 
 with open('private-key-atm-1-dsa.pem', 'rb') as prv_file:
-    private_key_atm_1 = DSA.import_key(prv_file.read())
+    dsa_private_key_atm_1 = DSA.import_key(prv_file.read())
 
 # Load bank's public key
 with open('public-key-bank-dsa.pem', 'rb') as keyfile:
-    public_key_bank = DSA.import_key(keyfile.read())
+    dsa_public_key_bank = DSA.import_key(keyfile.read())
 
 # fucntion to send messge properly
 def send(msg):
@@ -128,7 +128,7 @@ def DSAEncryption():
     hash_object = SHA256.new(user_account_1)
 
     # Create a signer object using the ATM1 private key
-    signer = DSS.new(private_key_atm_1, 'fips-186-3')
+    signer = DSS.new(dsa_private_key_atm_1, 'fips-186-3')
 
     # Sign the hash of the user account
     signature = signer.sign(hash_object)
