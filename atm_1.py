@@ -5,7 +5,9 @@ import base64
 from Crypto.Signature import pkcs1_15
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
-
+from Crypto.Signature import DSS
+from Crypto.Hash import SHA256
+from Crypto.PublicKey import DSA
 
 
 HEADER = 10
@@ -29,6 +31,13 @@ with open('private-key-atm-1.pem', 'rb') as prv_file:
 with open('public-key-bank.pem', 'rb') as keyfile:
     public_key_bank = serialization.load_pem_public_key(keyfile.read())
 
+#Load DSA Keys 
+with open('private-key-atm-1-dsa.pem', 'rb') as prv_file:
+    private_key_atm_1 = DSA.import_key(prv_file.read())
+
+# Load bank's public key
+with open('public-key-bank-dsa.pem', 'rb') as keyfile:
+    public_key_bank = DSA.import_key(keyfile.read())
 
 # fucntion to send messge properly
 def send(msg):
@@ -105,7 +114,38 @@ def RSAEncryption():
 
 
 def DSAEncryption():
-    pass
+    print("-------------------------------------------------")
+    print("[Hello! This is ATM 1]")
+    print("Please enter your ID")
+    id = input()
+    print("Please enter your password")
+    password = input()
+
+    # Convert ID and password into a dictionary using json.dumps
+    user_account_1 = json.dumps({'ID': id, 'password': password}).encode(FORMAT)
+
+    # Calculate the hash of the user account using SHA256
+    hash_object = SHA256.new(user_account_1)
+
+    # Create a signer object using the ATM1 private key
+    signer = DSS.new(private_key_atm_1, 'fips-186-3')
+
+    # Sign the hash of the user account
+    signature = signer.sign(hash_object)
+
+    # Encode the user account, hash, and signature in base64
+    encoded_user_account = base64.b64encode(user_account_1).decode(FORMAT)
+    encoded_hash = base64.b64encode(hash_object.digest()).decode(FORMAT)
+    encoded_signature = base64.b64encode(signature).decode(FORMAT)
+
+    # Create the message that will be sent, containing the encoded user account, hash, and signature
+    message = json.dumps({'user_account': encoded_user_account,
+                          'hash': encoded_hash,
+                          'signature': encoded_signature}).encode(FORMAT)
+
+    print(message)
+    client.send(message)
+
 
 #prompt to see what encryption to use
 print("[Hello! This is ATM 1]")
@@ -117,7 +157,7 @@ print("[2] DSA Encryption")
 option = input()
 if option == '1':
     RSAEncryption()
-elif option == 2:
+elif option == '2':
     DSAEncryption()
 else:
     print("Pease enter a valid option")
