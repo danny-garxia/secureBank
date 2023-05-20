@@ -42,8 +42,8 @@ with open('public-key-bank-dsa.pem', 'rb') as keyfile:
 # fucntion to send messge properly
 def send(msg):
     # Get the data length
-    msg_length = len(msg)
-
+    msg_length = len(client, msg)
+    
     # Convert the length to a string
     strLen = str(msg_length)
 
