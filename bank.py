@@ -10,9 +10,10 @@ from cryptography.hazmat.primitives import serialization, hashes
 import sqlite3
 import hashlib
 
+DATABASE = "userdata.db"
 
 HEADER = 64
-PORT = 5062
+PORT = 5061
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = 'utf-8'
@@ -42,8 +43,14 @@ account = {
 
 
 
-def display_amount_money():
-    pass
+def display_amount_money(id):
+    print("checking...")
+    with sqlite3.connect(DATABASE) as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT balance FROM userdata WHERE id = ?", (id))
+        result = cursor.fetchall()
+        print("your balance is:", result)
 
 def deposit_money():
     # TODO add deposit money action
@@ -90,32 +97,15 @@ def recv(server):
     return data
 
 
-DATABASE = "userdata.db"
+
 
 
 def hash_password(password):
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
-def login(conn, addr):
-    print(f"[NEW CONNECTION] {addr} connected.")
 
-    connected = True
-    while connected:
-        msg = conn.recv(1024).decode("utf-8")
 
-        if msg == "DISCONNECT":
-            connected = False
-
-        print(f"[{addr}] Message received: {msg}")
-
-        if authenticate_user(msg):
-            conn.send("Login successful!".encode("utf-8"))
-            # Perform actions for a successful login
-        else:
-            conn.send("Login failed!".encode("utf-8"))
-
-    conn.close()
 
 def authenticate_user(credentials):
     # Extract id and password from the decrypted message
@@ -135,8 +125,59 @@ def authenticate_user(credentials):
         else:
             return False
 
-
+def rsa_action(action):
+    message_from_atm = json.loads(action)
+    encrypted_message_from_atm = base64.b64decode(message_from_atm['encrypted_user_account'])
+    decrypted_message_from_atm_json = private_key_bank.decrypt(
+            encrypted_message_from_atm,
+            padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                            algorithm=hashes.SHA256(), label=None))
+    
+    decrypted_message_from_atm = json.loads(decrypted_message_from_atm)
+    id = decrypted_message_from_atm["ID"]
+    do_action = decrypted_message_from_atm["action"]
+    # Extract id and password from the decrypted message
+    
+    
+    # Connect to the database
+    
         
+def decode_message_and_identify_request(msg):
+    print("msg:",msg)
+    message_from_atm = json.loads(msg)
+    print("decode_message_and_identify_request...:",message_from_atm)
+    encrypted_message_from_atm = base64.b64decode(message_from_atm['encrypted_user_account'])
+    decrypted_message_from_atm_json = private_key_bank.decrypt(
+        encrypted_message_from_atm,
+        padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
+    )
+    digital_signature = base64.b64decode(message_from_atm['Digital_Signature'])
+    decrypted_message_from_atm = decrypted_message_from_atm_json.decode(FORMAT)
+
+    try:
+        public_key_atm_1.verify(
+            digital_signature,
+            encrypted_message_from_atm,
+            padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+            hashes.SHA256()
+        )
+        print('Signature valid')
+    except:
+        print('Signature not valid')
+
+    decrypted_message_from_atm = json.loads(decrypted_message_from_atm)
+    
+    # Check if the request is for checking funds
+    if decrypted_message_from_atm.get("request") == "checkFunds":
+        id = decrypted_message_from_atm["ID"]
+        display_amount_money(id)  # Call the function to display the amount of money for the given ID
+        return {"authenticated": True}
+    else:
+        print("Unknown request type:", decrypted_message_from_atm.get("request"))
+        return {"authenticated": False}
+    
+
+
 
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
@@ -153,21 +194,21 @@ def handle_client(conn, addr):
         
         
         message_from_atm = json.loads(msg)
-        print("message_from_atm",message_from_atm)
+        #print("message_from_atm",message_from_atm)
         encrypted_message_from_atm = base64.b64decode(message_from_atm['encrypted_user_account'])
-        print("encrypted_message_from_atm",encrypted_message_from_atm)
+        #print("encrypted_message_from_atm",encrypted_message_from_atm)
 
         decrypted_message_from_atm_json = private_key_bank.decrypt(
             encrypted_message_from_atm,
             padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
                             algorithm=hashes.SHA256(), label=None))
         
-        digital_signature = base64.b64decode(message_from_atm['Digital_Signature'])
+        
         print("decrypted_message_from_atm_json",decrypted_message_from_atm_json)
         decrypted_message_from_atm = decrypted_message_from_atm_json.decode(FORMAT)
         print("Decrypted Message:", decrypted_message_from_atm, type(decrypted_message_from_atm))
         
-        
+        digital_signature = base64.b64decode(message_from_atm['Digital_Signature'])
         try:
             public_key_atm_1.verify(
                 digital_signature,
@@ -186,7 +227,11 @@ def handle_client(conn, addr):
         if authenticate_user(decrypted_message_from_atm):
             #if the user is authenticated, send a message to ATM:
             conn.send("Login successful!".encode(FORMAT))
+             # Add a check for an empty message
+            msg = conn.recv(1024).decode(FORMAT)
             
+            
+
         else:
             conn.send("Login failed!".encode(FORMAT))
 

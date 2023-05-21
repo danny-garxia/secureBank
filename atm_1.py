@@ -13,7 +13,7 @@ import hashlib
 
 
 HEADER = 64
-PORT = 5062
+PORT = 5061
 FORMAT = 'utf-8'
 DISCONNECT_MESSAGE = "!DISCONNECT"
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -43,13 +43,11 @@ with open('public-key-bank-dsa.pem', 'rb') as keyfile:
 
 # fucntion to send messge properly
 def send(msg):
-    message = msg.encode(FORMAT)
-    #get the data length
+    message = msg
     msg_length = len(message)
+    send_length = str(msg_length).encode(FORMAT)
+    send_length += b' ' * (HEADER - len(send_length))
 
-    # string the datat length
-    strLen = str(msg_length).encode(FORMAT)
-    send_length +=b' ' * (HEADER - len(send_length))
     client.send(send_length)
     client.send(message)
 
@@ -77,23 +75,24 @@ def recv(client):
 
 with open('private-key-bank.pem', 'rb') as keyfile:
     private_key_bank = serialization.load_pem_private_key(keyfile.read(), password=None) 
-
-def checkFunds():
+"""
+def checkFunds(id):
     print("-------------------------------------------------")
     print("[Hello! This is ATM 1]")
     print("Checking funds...")
 
     # checking funds using the dictionary
-    request_message = json.dumps({'request': 'checkFunds'}).encode(FORMAT)
+    request_message = json.dumps({'request': 'checkFunds', "ID": id}).encode(FORMAT)
     # encrypting request message with banks public key using SHA256 encryption
     encrypted_request = public_key_bank.encrypt(request_message, padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None))
 
     signature = private_key_atm_1.sign(request_message, padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
 
     final_output = base64.b64encode(signature + encrypted_request)
-
-    send(final_output)
-    result = recv(client)
+    print("final_output: ",final_output)
+    client.send(final_output)
+    result = client.recv(1024)
+    
     result = base64.b64decode(result)
     signature = result[:256]
     encrypted_result = result[256:]
@@ -109,6 +108,9 @@ def checkFunds():
     decrypted_result = json.loads(decrypted_result.decode(FORMAT))
     print("Your account balance is: $", decrypted_result["account_balance"])
     print("-------------------------------------------------")
+
+"""
+
 
 
 
@@ -227,18 +229,18 @@ def deposit(amount):
 #checkFunds()
 #withdraw(100)
 #deposit(200)
-def menu():
+def menu(id):
     print("What would you like to do?")
     print("1. Check account balance")
     print("2. Withdrawl")
     print("3. Deposit")
     print("4. Exit")
-
+    
     option = input()
 
     if option == '1':
         
-        checkFunds()
+        check_funds(id)
         menu()
     elif option == '2':
         DSAEncryption()
@@ -255,19 +257,17 @@ def menu():
         print("Invalid option.\n")
         menu()
 
-def RSAEncryption():
+def RSAEncryption(id ,password=None, action_req=None):
     print("-------------------------------------------------")
     print("[Hello! This is ATM 1]")
-    print("Please enter you ID")
-    id = input()
-    print("Please enter your password")
-    password = input()
+    if id == "":
+        id = input("input id: ")
 
 
     # this will take id and passowrd and make it into a dictionary using json.dumps
-    user_account = json.dumps({'ID': id, 'password': password}).encode(FORMAT)
-    print(user_account.decode(FORMAT))
-   
+    user_account = json.dumps({'ID': id, 'password': password, 'action':action_req}).encode(FORMAT)
+    #print(user_account.decode(FORMAT))
+    
    
     # Encrypts user_account dictionary with banks public key using SHA256 encryption. 
     encrypted_user_account = public_key_bank.encrypt(user_account, 
@@ -289,13 +289,16 @@ def RSAEncryption():
                         "Digital_Signature": DS_E_User_Acount}).encode(FORMAT)
     
     client.send(message)
-    if client.recv(1024).decode(FORMAT) == "Login successful!":
-        print(client.recv(1024).decode(FORMAT))
-        menu()
-    else:
-        print(client.recv(1024).decode(FORMAT))
+    if password:
+        if client.recv(1024).decode(FORMAT) == "Login successful!":
+            print("Login successful!")
+            menu(id)
+        else:
+            print("login failed")
 
 
+
+    
 def DSAEncryption():
     print("-------------------------------------------------")
     print("[Hello! This is ATM 1]")
@@ -331,7 +334,9 @@ def DSAEncryption():
     print(client.recv(1024).decode(FORMAT))
 
          
-
+def check_funds(id):
+    RSAEncryption(id, action_req="check_funds")
+    
 
 #prompt to see what encryption to use
 print("[Hello! This is ATM 1]")
@@ -342,7 +347,11 @@ print("[2] DSA Encryption")
 # choose encryption
 option = input()
 if option == '1':
-    RSAEncryption()
+    print("Please enter you ID")
+    id = input()
+    print("Please enter your password")
+    password = input()
+    RSAEncryption(id, password)
 elif option == '2':
     DSAEncryption()
 else:
