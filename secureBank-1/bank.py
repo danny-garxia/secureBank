@@ -7,10 +7,12 @@ import sys
 from Crypto.Signature import pkcs1_15
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
+import sqlite3
+import hashlib
 
 
 HEADER = 64
-PORT = 5054
+PORT = 5055
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = 'utf-8'
@@ -41,7 +43,6 @@ account = {
 
 
 def display_amount_money():
-    # TODO add display amout of money in account
     pass
 
 def deposit_money():
@@ -62,78 +63,96 @@ def quit():
     pass
 
 def send(msg):
+    message = msg.encode(FORMAT)
     #get the data length
-    msg_length = len(server, msg)
+    msg_length = len(message)
 
     # string the datat length
-    strLen = str(msg_length)
-
-    # padd the header with "0"
-    while len(strLen) < HEADER:
-        strLen = "0" + strLen
-
-    # the final messege
-    finalmsg = strLen.encode() + msg
-    server.sendall(finalmsg)
+    strLen = str(msg_length).encode(FORMAT)
+    send_length +=b' ' * (HEADER - len(send_length))
+    server.send(send_length)
+    server.send(message)
 
 def recv(server):
-
-        # receive the header
     header = server.recv(HEADER)
+    if not header:
+        return None
 
-        #decode into a string
     strHead = header.decode()
-
-        #convert the header into an int
     intHead = int(strHead)
 
     data = b''
-    recvData = b''
-
     while len(data) < intHead:
         recvData = server.recv(intHead - len(data))
-
-        if recvData:
-            data += recvData
+        if not recvData:
+            break
+        data += recvData
     return data
+
+
+
+        
 
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
 
     connected = True
     while connected:
-        msg_length = conn.recv(HEADER).decode(FORMAT)
-        if msg_length:
-            msg_length = int(msg_length)
-          
-            msg = conn.recv(msg_length).decode(FORMAT)
-            if msg == DISCONNECT_MESSAGE:
-                connected = False
-            #print(msg)
-            print(f"[{addr}] {msg}")
-            conn.send("Msg received".encode(FORMAT))
+        msg = conn.recv(1024).decode(FORMAT)
+    
+        if msg == DISCONNECT_MESSAGE:
+            connected = False
+        
+        print(f"The [{addr}] {msg}")
+        conn.send("Msg received".encode(FORMAT))
+        
+        message_from_atm = json.loads(msg)
+        print("message_from_atm",message_from_atm)
+        encrypted_message_from_atm = base64.b64decode(message_from_atm['encrypted_user_account_1'])
+        print("encrypted_message_from_atm",encrypted_message_from_atm)
 
+        decrypted_message_from_atm_json = private_key_bank.decrypt(
+            encrypted_message_from_atm,
+            padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                            algorithm=hashes.SHA256(), label=None))
+        
+        digital_signature = base64.b64decode(message_from_atm['Digital_Signature'])
+        print("decrypted_message_from_atm_json",decrypted_message_from_atm_json)
+        decrypted_message_from_atm = decrypted_message_from_atm_json.decode(FORMAT)
+        print("Decrypted Message:", decrypted_message_from_atm, type(decrypted_message_from_atm))
+        
+        
+        try:
+            public_key_atm_1.verify(
+                digital_signature,
+                encrypted_message_from_atm,
+                padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
+                            salt_length=padding.PSS.MAX_LENGTH),
+                hashes.SHA256()
+            )
+            print('Signature valid', addr)
+        except:
+            print('Signature not valid', addr)
 
+# Extract id and password from the decrypted message
+        decrypted_message_from_atm = json.loads(decrypted_message_from_atm)
+        username = decrypted_message_from_atm["ID"]
+        
+        password = decrypted_message_from_atm["password"]
+        password = hashlib.sha256(password.encode()).hexdigest()
 
+        #connect to the database
+        connect = sqlite3.connect("userdata")
+        cur = connect.cursor()
 
-
-
-################################################
-            message_from_atm = json.loads(msg)
-            encrypted_message_from_atm = base64.b64decode(message_from_atm['encrypted_user_account_1'])
-            #decrypted_message_from_atm = private_key_bank.decrypt(encrypted_message_from_atm,
-                                                                   #padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                                                                                #algorithm=hashes.SHA256(), label=None))
-            digital_signature = base64.b64decode(message_from_atm['Digital_Signature'])
-
-            try:
-                public_key_atm_1.verify(digital_signature,
-                                        encrypted_message_from_atm,
-                                        padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
-                                                    salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
-                print('Signature valid', addr)
-            except:
-                print('Signature not valid', addr)
+        cur.execute("SELECT * FROM userdata WHERE username = ? AND password = ?", (username, password))
+        if cur.fetchall():
+            print("login successful")
+            conn.send("Login successful!".encode(FORMAT))
+            # 5 Actions:
+            
+        else:
+            conn.send("Login failed!".encode(FORMAT))
 
     conn.close()
 
@@ -146,8 +165,7 @@ def start():
         conn, addr = server.accept()
         thread = threading.Thread(target=handle_client, args=(conn, addr))
         thread.start()
-        print(f"[ACTIVE CONNECTIONS] {threading.activeCount() - 1}")
-        
+        print(f"[ACTIVE CONNECTIONS] {threading.active_count() - 1}")
         
 
 

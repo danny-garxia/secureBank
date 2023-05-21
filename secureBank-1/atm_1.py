@@ -8,10 +8,12 @@ from cryptography.hazmat.primitives import serialization, hashes
 from Crypto.Signature import DSS
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import DSA
+import sqlite3
+import hashlib
 
 
-HEADER = 10
-PORT = 5054
+HEADER = 64
+PORT = 5055
 FORMAT = 'utf-8'
 DISCONNECT_MESSAGE = "!DISCONNECT"
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -41,19 +43,15 @@ with open('public-key-bank-dsa.pem', 'rb') as keyfile:
 
 # fucntion to send messge properly
 def send(msg):
-    # Get the data length
-    msg_length = len(msg)
+    message = msg.encode(FORMAT)
+    #get the data length
+    msg_length = len(message)
 
-    # Convert the length to a string
-    strLen = str(msg_length)
-
-    # Pad the header with "0"
-    while len(strLen) < HEADER:
-        strLen = "0" + strLen
-
-    # The final message
-    finalmsg = strLen.encode() + msg
-    client.sendall(finalmsg)
+    # string the datat length
+    strLen = str(msg_length).encode(FORMAT)
+    send_length +=b' ' * (HEADER - len(send_length))
+    client.send(send_length)
+    client.send(message)
 
 # function to recevive messege properly
 def recv(client):
@@ -77,6 +75,8 @@ def recv(client):
             data += recvData
     return data
 
+with open('private-key-bank.pem', 'rb') as keyfile:
+    private_key_bank = serialization.load_pem_private_key(keyfile.read(), password=None) 
 
 def RSAEncryption():
     print("-------------------------------------------------")
@@ -87,28 +87,34 @@ def RSAEncryption():
     password = input()
 
 
-    # this will take id and passowrd and make it into a dictionary using json.sumps
+    # this will take id and passowrd and make it into a dictionary using json.dumps
     user_account_1 = json.dumps({'ID': id, 'password': password}).encode(FORMAT)
+    print(user_account_1.decode(FORMAT))
+   
+   
     # Encrypts user_account dictionary with banks public key using SHA256 encryption. 
     encrypted_user_account_1 = public_key_bank.encrypt(user_account_1, 
                                                     padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
                                                                 algorithm=hashes.SHA256(), label=None))
+    print("the mes", private_key_bank.decrypt(
+                encrypted_user_account_1,
+                padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                             algorithm=hashes.SHA256(), label=None)
+            ).decode(FORMAT))
     # provides a digital signature to our encrpyted user acount. 
     DS_E_User_Acount_1 = private_key_atm_1.sign(encrypted_user_account_1,
                                                 padding.PSS(mgf=padding.MGF1(hashes.SHA256()), 
                                                             salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
 
     # need to switch both to base64
-    encrypted_user_account_1 = base64.b64encode(encrypted_user_account_1).decode(FORMAT)
+    encrypted_user_account_1 = base64.b64encode(encrypted_user_account_1).decode(FORMAT)+ '"'
     DS_E_User_Acount_1 = base64.b64encode(DS_E_User_Acount_1).decode(FORMAT)
 
 
-    # this is the messege that we will send which contains the digitaly signed encryoted message
-    message = json.dumps({'encrypted_user_account_1': encrypted_user_account_1, 
-                        'Digital_Signature': DS_E_User_Acount_1}).encode(FORMAT)
+    # this is the messege that we will send which contains the digitaly signed encrypted message
+    message = json.dumps({"encrypted_user_account_1": encrypted_user_account_1, 
+                        "Digital_Signature": DS_E_User_Acount_1}).encode(FORMAT)
 
-
-    print(message)
     client.send(message)
 
 
@@ -122,8 +128,7 @@ def DSAEncryption():
 
     # Convert ID and password into a dictionary using json.dumps
     user_account_1 = json.dumps({'ID': id, 'password': password}).encode(FORMAT)
-
-    # Calculate the hash of the user account using SHA256
+    print(user_account_1) # Calculate the hash of the user account using SHA256
     hash_object = SHA256.new(user_account_1)
 
     # Create a signer object using the ATM1 private key
@@ -194,31 +199,6 @@ def checkFunds():
     print("-------------------------------------------------")
 
 
-print("What would you like to do?")
-print("1. Check account balance")
-print("2. Withdrawl")
-print("3. Deposit")
-print("4. Exit")
-
-option = input()
-
-if option == '1':
-    DSAEncryption()
-    checkFunds()
-
-elif option == '2':
-    DSAEncryption()
-    withdraw()
-
-elif option == '3':
-    DSAEncryption()
-    deposit()
-
-elif option =='4':
-    send(DISCONNECT_MESSAGE)
-
-else:
-    print("Invalid option.")
 
 def withdraw(amount):
     print("-------------------------------------------------")
@@ -332,10 +312,38 @@ def deposit(amount):
 
 # Uncomment the following lines to test the checkFunds, withdraw, and deposit functions
 
-checkFunds()
-withdraw(100)
-deposit(200)
+#checkFunds()
+#withdraw(100)
+#deposit(200)
+def menu():
+    print("What would you like to do?")
+    print("1. Check account balance")
+    print("2. Withdrawl")
+    print("3. Deposit")
+    print("4. Exit")
 
+    option = input()
+
+    if option == '1':
+        
+        checkFunds()
+        menu()
+    elif option == '2':
+        DSAEncryption()
+        withdraw()
+        menu()
+    elif option == '3':
+        DSAEncryption()
+        deposit()
+        menu()
+    elif option =='4':
+        client.close()
+
+    else:
+        print("Invalid option.\n")
+        menu()
+
+menu()
 # Disconnect from the server
-client.send(DISCONNECT_MESSAGE.encode(FORMAT))
+
 client.close()
