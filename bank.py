@@ -34,23 +34,20 @@ with open('public-key-atm-1.pem', 'rb') as keyfile:
 with open('public-key-atm-2.pem', 'rb') as keyfile:
     public_key_atm_2 = serialization.load_pem_public_key(keyfile.read())
 
-#mock data
-account = {
-    "Name" : "Joe Biden",
-    "ID" : 123456,
-    "password" : "test123"
-}
 
 
 
-def display_amount_money(id):
+
+def display_amount_money(con, id):
     print("checking...")
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
 
-        cursor.execute("SELECT balance FROM userdata WHERE id = ?", (id))
-        result = cursor.fetchall()
-        print("your balance is:", result)
+        cursor.execute("SELECT balance FROM userdata WHERE id = ?", (id,))
+        result = cursor.fetchone()
+        
+        msg = f"Your balance is: {result[0]}"
+        con.send(msg.encode(FORMAT))
 
 def deposit_money():
     # TODO add deposit money action
@@ -70,15 +67,14 @@ def quit():
     pass
 
 def send(msg):
+    print("sending msg:", msg)
     message = msg.encode(FORMAT)
-    #get the data length
     msg_length = len(message)
-
-    # string the datat length
-    strLen = str(msg_length).encode(FORMAT)
-    send_length +=b' ' * (HEADER - len(send_length))
+    send_length = str(msg_length).encode(FORMAT)
+    send_length += b' ' * (HEADER - len(send_length))
     server.send(send_length)
     server.send(message)
+
 
 def recv(server):
     header = server.recv(HEADER)
@@ -142,7 +138,7 @@ def rsa_action(action):
     # Connect to the database
     
         
-def decode_message_and_identify_request(msg):
+def RSA_decode_message_and_identify_request(conn, msg):
     print("msg:",msg)
     message_from_atm = json.loads(msg)
     print("decode_message_and_identify_request...:",message_from_atm)
@@ -166,14 +162,15 @@ def decode_message_and_identify_request(msg):
         print('Signature not valid')
 
     decrypted_message_from_atm = json.loads(decrypted_message_from_atm)
-    
+    print("action",decrypted_message_from_atm)
     # Check if the request is for checking funds
-    if decrypted_message_from_atm.get("request") == "checkFunds":
+    if decrypted_message_from_atm.get("action") == "checkFunds":
         id = decrypted_message_from_atm["ID"]
-        display_amount_money(id)  # Call the function to display the amount of money for the given ID
+        display_amount_money(conn, id)  # Call the function to display the amount of money for the given ID
         return {"authenticated": True}
     else:
-        print("Unknown request type:", decrypted_message_from_atm.get("request"))
+        print("Unknown request type:", decrypted_message_from_atm.get("action"))
+        print("action",decrypted_message_from_atm)
         return {"authenticated": False}
     
 
@@ -229,7 +226,8 @@ def handle_client(conn, addr):
             conn.send("Login successful!".encode(FORMAT))
              # Add a check for an empty message
             msg = conn.recv(1024).decode(FORMAT)
-            
+            print("msg",msg)
+            RSA_decode_message_and_identify_request(conn,msg)
             
 
         else:

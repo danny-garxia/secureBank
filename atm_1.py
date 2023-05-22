@@ -114,114 +114,16 @@ def checkFunds(id):
 
 
 
-def withdraw(amount):
-    print("-------------------------------------------------")
-    print("[Hello! This is ATM 1]")
-    print("Withdrawing funds...")
 
-    # Create a request message with the withdrawal amount
-    request_message = json.dumps({'request': 'withdraw', 'amount': amount}).encode(FORMAT)
+def withdraw(id,amount):
+    RSAEncryption(id,action_req= "withdraw", option = amount)
+   
 
-    # Encrypt the request message using the bank's public key
-    encrypted_request = public_key_bank.encrypt(request_message, 0)
+def deposit(id, amount):
+    RSAEncryption(id,action_req= "withdraw", option = amount)
 
-    # Sign the encrypted request using the ATM1's private key
-    signer = DSS.new(dsa_private_key_atm_1, 'fips-186-3')
-    signature = signer.sign(encrypted_request)
-
-    # Encode the encrypted request and signature in base64
-    encoded_encrypted_request = base64.b64encode(encrypted_request).decode(FORMAT)
-    encoded_signature = base64.b64encode(signature).decode(FORMAT)
-
-    # Create the message that will be sent, containing the encoded encrypted request and signature
-    message = json.dumps({'encrypted_request': encoded_encrypted_request,
-                          'signature': encoded_signature}).encode(FORMAT)
-
-    # Send the message to the bank
-    client.send(message)
-
-    # Receive the response from the bank
-    response = recv(client)
-
-    # Decode the response
-    response = response.decode(FORMAT)
-
-    # Parse the response as JSON
-    response_json = json.loads(response)
-
-    # Extract the encoded encrypted response and signature from the response JSON
-    encoded_encrypted_response = response_json['encrypted_response']
-    encoded_signature = response_json['signature']
-
-    # Decode the encoded encrypted response and signature from base64
-    encrypted_response = base64.b64decode(encoded_encrypted_response)
-    signature = base64.b64decode(encoded_signature)
-
-    # Verify the signature using the bank's public key and ATM1's DSA private key
-    verifier_bank = DSS.new(dsa_public_key_bank, 'fips-186-3')
-    verifier_atm_1 = DSS.new(dsa_private_key_atm_1, 'fips-186-3')
-
-    try:
-        verifier_bank.verify(encrypted_response, signature)
-        verifier_atm_1.verify(encrypted_response, signature)
-        print("Withdrawal successful.")
-    except ValueError:
-        print("Invalid response received from the bank.")
-
-def deposit(amount):
-    print("-------------------------------------------------")
-    print("[Hello! This is ATM 1]")
-    print("Depositing funds...")
-
-    # Create a request message with the deposit amount
-    request_message = json.dumps({'request': 'deposit', 'amount': amount}).encode(FORMAT)
-
-    # Encrypt the request message using the bank's public key
-    encrypted_request = public_key_bank.encrypt(request_message, 0)
-
-    # Sign the encrypted request using the ATM1's private key
-    signer = DSS.new(dsa_private_key_atm_1, 'fips-186-3')
-    signature = signer.sign(encrypted_request)
-
-    # Encode the encrypted request and signature in base64
-    encoded_encrypted_request = base64.b64encode(encrypted_request).decode(FORMAT)
-    encoded_signature = base64.b64encode(signature).decode(FORMAT)
-
-    # Create the message that will be sent, containing the encoded encrypted request and signature
-    message = json.dumps({'encrypted_request': encoded_encrypted_request,
-                          'signature': encoded_signature}).encode(FORMAT)
-
-    # Send the message to the bank
-    client.send(message)
-
-    # Receive the response from the bank
-    response = recv(client)
-
-    # Decode the response
-    response = response.decode(FORMAT)
-
-    # Parse the response as JSON
-    response_json = json.loads(response)
-
-    # Extract the encoded encrypted response and signature from the response JSON
-    encoded_encrypted_response = response_json['encrypted_response']
-    encoded_signature = response_json['signature']
-
-    # Decode the encoded encrypted response and signature from base64
-    encrypted_response = base64.b64decode(encoded_encrypted_response)
-    signature = base64.b64decode(encoded_signature)
-
-    # Verify the signature using the bank's public key and ATM1's DSA private key
-    verifier_bank = DSS.new(dsa_public_key_bank, 'fips-186-3')
-    verifier_atm_1 = DSS.new(dsa_private_key_atm_1, 'fips-186-3')
-
-    try:
-        verifier_bank.verify(encrypted_response, signature)
-        verifier_atm_1.verify(encrypted_response, signature)
-        print("Deposit successful.")
-    except ValueError:
-        print("Invalid response received from the bank.")
-
+def Account_activities(id, activities):
+    RSAEncryption(id,action_req= "activities")
 
 
 # Uncomment the following lines to test the checkFunds, withdraw, and deposit functions
@@ -229,35 +131,46 @@ def deposit(amount):
 #checkFunds()
 #withdraw(100)
 #deposit(200)
+
+
+
+         
+
 def menu(id):
     print("What would you like to do?")
     print("1. Check account balance")
     print("2. Withdrawl")
     print("3. Deposit")
-    print("4. Exit")
+    print("4. Account activities")
+    print("5. Exit")
     
     option = input()
 
     if option == '1':
         
         check_funds(id)
-        menu()
+        menu(id)
+
     elif option == '2':
-        DSAEncryption()
-        withdraw()
-        menu()
+        
+        withdraw(id)
+        menu(id)
+
     elif option == '3':
-        DSAEncryption()
-        deposit()
-        menu()
-    elif option =='4':
+        
+        deposit(id)
+        menu(id)
+
+    elif option == '4':
+        pass
+
+    elif option =='5':
         client.close()
 
     else:
         print("Invalid option.\n")
-        menu()
-
-def RSAEncryption(id ,password=None, action_req=None):
+        menu(id)
+def RSAEncryption(id ,password=None, action_req=None, option = None):
     print("-------------------------------------------------")
     print("[Hello! This is ATM 1]")
     if id == "":
@@ -265,7 +178,7 @@ def RSAEncryption(id ,password=None, action_req=None):
 
 
     # this will take id and passowrd and make it into a dictionary using json.dumps
-    user_account = json.dumps({'ID': id, 'password': password, 'action':action_req}).encode(FORMAT)
+    user_account = json.dumps({'ID': id, 'password': password, 'action':action_req, 'option': option}).encode(FORMAT)
     #print(user_account.decode(FORMAT))
     
    
@@ -289,6 +202,7 @@ def RSAEncryption(id ,password=None, action_req=None):
                         "Digital_Signature": DS_E_User_Acount}).encode(FORMAT)
     
     client.send(message)
+    
     if password:
         if client.recv(1024).decode(FORMAT) == "Login successful!":
             print("Login successful!")
@@ -296,7 +210,14 @@ def RSAEncryption(id ,password=None, action_req=None):
         else:
             print("login failed")
 
-
+            print("Please enter you ID")
+            id = input()
+            print("Please enter your password")
+            password = input()
+            RSAEncryption(id, password)
+    else:
+        print(client.recv(1024).decode(FORMAT))
+        
 
     
 def DSAEncryption():
@@ -335,7 +256,7 @@ def DSAEncryption():
 
          
 def check_funds(id):
-    RSAEncryption(id, action_req="check_funds")
+    RSAEncryption(id, action_req="checkFunds")
     
 
 #prompt to see what encryption to use
@@ -345,19 +266,21 @@ print("[1] RSA encryption")
 print("[2] DSA Encryption")
 
 # choose encryption
-option = input()
-if option == '1':
-    print("Please enter you ID")
-    id = input()
-    print("Please enter your password")
-    password = input()
-    RSAEncryption(id, password)
-elif option == '2':
-    DSAEncryption()
-else:
-    print("Pease enter a valid option")
-    
+def rsa_or_dsa():
+    option = input()
+    if option == '1':
+        print("Please enter you ID:")
+        id = input()
+        print("Please enter your password:")
+        password = input()
+        RSAEncryption(id, password)
+    elif option == '2':
+        DSAEncryption()
+    else:
+        print("\nPease enter a valid option\n")
+        rsa_or_dsa()
 
+rsa_or_dsa()
 
 
 # Disconnect from the server
