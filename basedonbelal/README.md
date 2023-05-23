@@ -2,7 +2,7 @@
 
 Daniel Garcia 
 Daniel Palacio 
-Joshy 
+Joshua Gonzalez
 Belle
 Bike Qian
 We contributed the work evenly. 
