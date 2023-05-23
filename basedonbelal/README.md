@@ -15,7 +15,7 @@ Instructions to Run:
 3.run atm_1.py and atm_2.py in different terminal at the same time
 
 4. Choose weather you want to use RSA or DSA encryption 
-5. Enter user and password which are previous created in the databse (user1:"belal1", password:belalpass23
+5. Enter user and password which are previous created in the databse (user1:belal1, password:belalpass23
 user2: daniel  password: danielpass112
 user3: john12 password: johnpass11)
 
